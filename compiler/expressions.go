@@ -865,7 +865,8 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 			if len(args) == 2 && fc.pkgCtx.Types[args[1]].Value == nil {
 				return fc.formatExpr(`((%1f < 0 || %1f > 2147483647) ? $throwRuntimeError("makemap: size out of range") : {})`, args[1])
 			}
-			return fc.formatExpr("{}")
+			return fc.formatExpr(`new Map()`)
+			//return fc.formatExpr("{}")
 		case *types.Chan:
 			length := "0"
 			if len(args) == 2 {
@@ -884,7 +885,7 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		case *types.Pointer:
 			return fc.formatExpr("(%e, %d)", args[0], argType.Elem().(*types.Array).Len())
 		case *types.Map:
-			return fc.formatExpr("$keys(%e).length", args[0])
+			return fc.formatExpr("%e.size", args[0])
 		case *types.Chan:
 			return fc.formatExpr("%e.$buffer.length", args[0])
 		// length of array is constant

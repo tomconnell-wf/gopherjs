@@ -205,22 +205,27 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			}, label, fc.Flattened[s])
 
 		case *types.Map:
+			// TODO - probably could make this more effient with a for..of
 			iVar := fc.newVariable("_i")
 			fc.Printf("%s = 0;", iVar)
 			keysVar := fc.newVariable("_keys")
-			fc.Printf("%s = $keys(%s);", keysVar, refVar)
-			fc.translateLoopingStmt(func() string { return iVar + " < " + keysVar + ".length" }, s.Body, func() {
+			fc.Printf("%s = %s.keys();", keysVar, refVar)
+
+			fc.translateLoopingStmt(func() string { return iVar + " < " + refVar + ".size" }, s.Body, func() {
+				keyVar := fc.newVariable("_key")
 				entryVar := fc.newVariable("_entry")
-				fc.Printf("%s = %s[%s[%s]];", entryVar, refVar, keysVar, iVar)
+				fc.Printf("%s = %s.next().value;", keyVar, keysVar)
+				fc.Printf("%s = %s.get(%s);", entryVar, refVar, keyVar)
+				//fc.Printf("console.log('loop', %s, %s, %s, %s, %s)", refVar, keyVar, entryVar, keysVar, iVar)
 				fc.translateStmt(&ast.IfStmt{
 					Cond: fc.newIdent(entryVar+" === undefined", types.Typ[types.Bool]),
 					Body: &ast.BlockStmt{List: []ast.Stmt{&ast.BranchStmt{Tok: token.CONTINUE}}},
 				}, nil)
 				if !isBlank(s.Key) {
-					fc.Printf("%s", fc.translateAssign(s.Key, fc.newIdent(entryVar+".k", t.Key()), s.Tok == token.DEFINE))
+					fc.Printf("%s", fc.translateAssign(s.Key, fc.newIdent(keyVar, t.Key()), s.Tok == token.DEFINE))
 				}
 				if !isBlank(s.Value) {
-					fc.Printf("%s", fc.translateAssign(s.Value, fc.newIdent(entryVar+".v", t.Elem()), s.Tok == token.DEFINE))
+					fc.Printf("%s", fc.translateAssign(s.Value, fc.newIdent(entryVar, t.Elem()), s.Tok == token.DEFINE))
 				}
 			}, func() {
 				fc.Printf("%s++;", iVar)
