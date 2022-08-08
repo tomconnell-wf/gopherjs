@@ -935,7 +935,6 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 				return fc.formatExpr(`((%1f < 0 || %1f > 2147483647) ? $throwRuntimeError("makemap: size out of range") : {})`, args[1])
 			}
 			return fc.formatExpr(`new Map()`)
-			//return fc.formatExpr("{}")
 		case *types.Chan:
 			length := "0"
 			if len(args) == 2 {

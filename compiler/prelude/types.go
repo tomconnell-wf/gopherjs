@@ -617,13 +617,11 @@ var $mapType = function(key, elem) {
   return typ;
 };
 var $makeMap = function(keyForFunc, entries) {
-  //console.log("$makeMap input", keyForFunc, entries) 
   var m = new Map();
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
     m.set(keyForFunc(e.k), e.v);
   }
-  //console.log("$makeMap output", m)
   return m;
 };
 var $ptrType = function(elem) {

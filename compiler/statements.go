@@ -208,7 +208,6 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			}, label, fc.Flattened[s])
 
 		case *types.Map:
-			// TODO - probably could make this more efficient with a for..of
 			iVar := fc.newVariable("_i")
 			fc.Printf("%s = 0;", iVar)
 			keysVar := fc.newVariable("_keys")
