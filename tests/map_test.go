@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -32,49 +32,90 @@ func Test_MapMakeSizeHint(t *testing.T) {
 
 func Test_MapNew(t *testing.T) {
 	myMap := new(map[string]int)
-	assert.Nil(t, *myMap)
-	assert.IsType(t, map[string]int{}, *myMap)
+	if *myMap != nil {
+		t.Error(`map should be nil when made with new()`)
+	}
 }
 
 func Test_MapType(t *testing.T) {
-	var myMap map[string]int
-	assert.Nil(t, myMap)
-	assert.IsType(t, map[string]int{}, myMap)
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error(`assignment on nil map should panic`)
+		} else {
+			str := err.(error).Error()
+			if !strings.Contains(str, `assignment to entry in nil map`) {
+				t.Error(`assigning to a nil map should panic`)
+			}
+		}
+	}()
 
-	// assert.PanicsWithError has more than just the message `assignment to entry in nil map` in gopherjs runtime.
-	// There's the stack, also.  There doesn't seem to be an assert api to check a message substring.
-	assert.Panics(t, func() { myMap[`key`] = 666 })
+	var myMap map[string]int
+	if myMap != nil {
+		t.Error(`map should be nil when declared with var`)
+	}
+
+	myMap[`key`] = 666
 }
 
 func assertMapApi(t *testing.T, myMap map[string]int) {
-	assert.IsType(t, map[string]int{}, myMap, `type assertion`)
-	assert.Equal(t, 3, len(myMap), `initial len`)
+	if len(myMap) != 3 {
+		t.Error(`initial len of map should be 3`)
+	}
 
-	assert.Equal(t, 0, myMap[`test`], `access by key 1`)
-	assert.Equal(t, 1, myMap[`key`], `access by key 2`)
-	assert.Equal(t, 0, myMap[`missing`], `access by key 3`)
+	if myMap[`test`] != 0 {
+		t.Error(`value should be 0`)
+	}
+	if myMap[`key`] != 1 {
+		t.Error(`value should be 1`)
+	}
+	if myMap[`missing`] != 0 {
+		t.Error(`absent key value should be 0`)
+	}
 
 	charm, found := myMap[`charm`]
-	assert.Equal(t, 2, charm, `tuple access by key, found`)
-	assert.True(t, found, `tuple access by key, found`)
+	if charm != 2 {
+		t.Error(`value should be 2`)
+	}
+	if !found {
+		t.Error(`key should be found`)
+	}
+
 	missing2, found := myMap[`missing`]
-	assert.Equal(t, 0, missing2, `tuple access by missing key, found`)
-	assert.False(t, found, `tuple access by missing key, found`)
+	if missing2 != 0 {
+		t.Error(`absent key value should be 0`)
+	}
+	if found {
+		t.Error(`absent key should not be found`)
+	}
 
 	delete(myMap, `missing`)
-	assert.Equal(t, 3, len(myMap), `noop delete`)
+	if len(myMap) != 3 {
+		t.Error(`len after noop delete should still be 3`)
+	}
 
 	delete(myMap, `charm`)
-	assert.Equal(t, 2, len(myMap), `delete`)
+	if len(myMap) != 2 {
+		t.Error(`len after delete should still be 2`)
+	}
 
 	myMap[`add`] = 3
-	assert.Equal(t, 3, len(myMap), `assign by key len`)
-	assert.Equal(t, 3, myMap[`add`], `assign by key`)
+	if len(myMap) != 3 {
+		t.Error(`len after assign by key should be 3`)
+	}
+	if myMap[`add`] != 3 {
+		t.Error(`value should be 3`)
+	}
 
 	myMap[`add`] = 10
-	assert.Equal(t, 3, len(myMap), `update by key len`)
-	assert.Equal(t, 10, myMap[`add`], `update by key`)
+	if len(myMap) != 3 {
+		t.Error(`len after update by key should be 3`)
+	}
+	if myMap[`add`] != 10 {
+		t.Error(`value should be 10`)
+	}
 
-	copy := myMap
-	assert.Equal(t, copy, myMap, `reference equality`)
+	myMap2 := myMap
+	if len(myMap2) != len(myMap) {
+		t.Error(`copy should be equivalent`)
+	}
 }
