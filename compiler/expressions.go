@@ -474,10 +474,23 @@ func (fc *funcContext) translateExpr(expr ast.Expr) *expression {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: e.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
 			key := fmt.Sprintf("%s.keyFor(%s)", fc.typeName(t.Key()), fc.translateImplicitConversion(e.Index, t.Key()))
+			entryVar := fc.newVariable("_entry")
 			if _, isTuple := exprType.(*types.Tuple); isTuple {
-				return fc.formatExpr(`(%1s = %2e[%3s], %1s !== undefined ? [%1s.v, true] : [%4e, false])`, fc.newVariable("_entry"), e.X, key, fc.zeroValue(t.Elem()))
+				return fc.formatExpr(
+					`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? [%1s, true] : [%4e, false])`,
+					entryVar,
+					e.X,
+					key,
+					fc.zeroValue(t.Elem()),
+				)
 			}
-			return fc.formatExpr(`(%1s = %2e[%3s], %1s !== undefined ? %1s.v : %4e)`, fc.newVariable("_entry"), e.X, key, fc.zeroValue(t.Elem()))
+			return fc.formatExpr(
+				`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? %1s : %4e)`,
+				entryVar,
+				e.X,
+				key,
+				fc.zeroValue(t.Elem()),
+			)
 		case *types.Basic:
 			return fc.formatExpr("%e.charCodeAt(%f)", e.X, e.Index)
 		default:
@@ -914,7 +927,12 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 	case "delete":
 		args = fc.expandTupleArgs(args)
 		keyType := fc.pkgCtx.TypeOf(args[0]).Underlying().(*types.Map).Key()
-		return fc.formatExpr(`delete %e[%s.keyFor(%s)]`, args[0], fc.typeName(keyType), fc.translateImplicitConversion(args[1], keyType))
+		return fc.formatExpr(
+			`%e.delete(%s.keyFor(%s))`,
+			args[0],
+			fc.typeName(keyType),
+			fc.translateImplicitConversion(args[1], keyType),
+		)
 	case "copy":
 		args = fc.expandTupleArgs(args)
 		if basic, isBasic := fc.pkgCtx.TypeOf(args[1]).Underlying().(*types.Basic); isBasic && isString(basic) {
