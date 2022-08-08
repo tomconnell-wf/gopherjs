@@ -211,7 +211,7 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			iVar := fc.newVariable("_i")
 			fc.Printf("%s = 0;", iVar)
 			keysVar := fc.newVariable("_keys")
-			fc.Printf("%s = %s.keys();", keysVar, refVar)
+			fc.Printf("%s = %s ? %s.keys() : [];", keysVar, refVar, refVar)
 
 			fc.translateLoopingStmt(func() string { return iVar + " < " + refVar + ".size" }, s.Body, func() {
 				keyVar := fc.newVariable("_key")
