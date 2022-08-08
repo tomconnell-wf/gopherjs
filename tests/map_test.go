@@ -40,6 +40,10 @@ func Test_MapType(t *testing.T) {
 	var myMap map[string]int
 	assert.Nil(t, myMap)
 	assert.IsType(t, map[string]int{}, myMap)
+
+	// assert.PanicsWithError has more than just the message `assignment to entry in nil map` in gopherjs runtime.
+	// There's the stack, also.  There doesn't seem to be an assert api to check a message substring.
+	assert.Panics(t, func() { myMap[`key`] = 666 })
 }
 
 func assertMapApi(t *testing.T, myMap map[string]int) {
@@ -51,11 +55,11 @@ func assertMapApi(t *testing.T, myMap map[string]int) {
 	assert.Equal(t, 0, myMap[`missing`], `access by key 3`)
 
 	charm, found := myMap[`charm`]
-	assert.Equal(t, 2, charm, `access by key, found`)
-	assert.True(t, found, `access by key, found`)
+	assert.Equal(t, 2, charm, `tuple access by key, found`)
+	assert.True(t, found, `tuple access by key, found`)
 	missing2, found := myMap[`missing`]
-	assert.Equal(t, 0, missing2, `access by missing key, found`)
-	assert.False(t, found, `access by missing key, found`)
+	assert.Equal(t, 0, missing2, `tuple access by missing key, found`)
+	assert.False(t, found, `tuple access by missing key, found`)
 
 	delete(myMap, `missing`)
 	assert.Equal(t, 3, len(myMap), `noop delete`)
