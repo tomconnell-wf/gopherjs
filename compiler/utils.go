@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"go/types"
 	"net/url"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -113,6 +114,10 @@ func (fc *funcContext) translateArgs(sig *types.Signature, argExprs []ast.Expr, 
 	argExprs = fc.expandTupleArgs(argExprs)
 
 	sigTypes := signatureTypes{Sig: sig}
+
+	if sig.Variadic() && len(argExprs) == 0 {
+		return []string{fmt.Sprintf("%s.nil", fc.typeName(sigTypes.VariadicType()))}
+	}
 
 	preserveOrder := false
 	for i := 1; i < len(argExprs); i++ {
@@ -791,12 +796,14 @@ func (b *FatalError) Write(p []byte) (n int, err error) { return b.clues.Write(p
 
 func (b FatalError) Error() string {
 	buf := &strings.Builder{}
-	fmt.Fprintln(buf, "[compiler panic] ", b.Unwrap())
+	fmt.Fprintln(buf, "[compiler panic] ", strings.TrimSpace(b.Unwrap().Error()))
 	if b.clues.Len() > 0 {
-		fmt.Fprintln(buf, "\n", b.clues.String())
+		fmt.Fprintln(buf, "\n"+b.clues.String())
 	}
 	if len(b.stack) > 0 {
-		fmt.Fprintln(buf, "\n", string(b.stack))
+		// Shift stack track by 2 spaces for better readability.
+		stack := regexp.MustCompile("(?m)^").ReplaceAll(b.stack, []byte("  "))
+		fmt.Fprintln(buf, "\nOriginal stack trace:\n", string(stack))
 	}
 	return buf.String()
 }

@@ -3,6 +3,8 @@ package build
 import (
 	"fmt"
 	"go/build"
+	"go/token"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -11,9 +13,52 @@ import (
 	"sort"
 	"strings"
 
+	_ "github.com/gopherjs/gopherjs/build/versionhack" // go/build release tags hack.
 	"github.com/gopherjs/gopherjs/compiler"
+	"github.com/gopherjs/gopherjs/compiler/gopherjspkg"
+	"github.com/gopherjs/gopherjs/compiler/natives"
 	"golang.org/x/tools/go/buildutil"
 )
+
+// Env contains build environment configuration required to define an instance
+// of XContext.
+type Env struct {
+	GOROOT string
+	GOPATH string
+
+	GOOS   string
+	GOARCH string
+
+	BuildTags     []string
+	InstallSuffix string
+}
+
+// DefaultEnv creates a new instance of build Env according to environment
+// variables.
+//
+// By default, GopherJS will use GOOS=js GOARCH=ecmascript to build non-standard
+// library packages. If GOOS or GOARCH environment variables are set and not
+// empty, user-provided values will be used instead. This is done to facilitate
+// transition from the legacy GopherJS behavior, which used native GOOS, and may
+// be removed in future.
+func DefaultEnv() Env {
+	e := Env{}
+	e.GOROOT = DefaultGOROOT
+	e.GOPATH = build.Default.GOPATH
+
+	if val := os.Getenv("GOOS"); val != "" {
+		e.GOOS = val
+	} else {
+		e.GOOS = "js"
+	}
+
+	if val := os.Getenv("GOARCH"); val != "" {
+		e.GOARCH = val
+	} else {
+		e.GOARCH = "ecmascript"
+	}
+	return e
+}
 
 // XContext is an extension of go/build.Context with GopherJS-specifc features.
 //
@@ -24,9 +69,8 @@ type XContext interface {
 	// interpreting local import paths relative to the srcDir directory.
 	Import(path string, srcDir string, mode build.ImportMode) (*PackageData, error)
 
-	// GOOS returns GOOS value the underlying build.Context is using.
-	// This will become obsolete after https://github.com/gopherjs/gopherjs/issues/693.
-	GOOS() string
+	// Env returns build environment configuration this context has been set up for.
+	Env() Env
 
 	// Match explans build patterns into a set of matching import paths (see go help packages).
 	Match(patterns []string) ([]string, error)
@@ -35,13 +79,14 @@ type XContext interface {
 // simpleCtx is a wrapper around go/build.Context with support for GopherJS-specific
 // features.
 type simpleCtx struct {
-	bctx      build.Context
-	isVirtual bool // Imported packages don't have a physical directory on disk.
+	bctx         build.Context
+	isVirtual    bool // Imported packages don't have a physical directory on disk.
+	noPostTweaks bool // Don't apply post-load tweaks to packages. For tests only.
 }
 
 // Import implements XContext.Import().
 func (sc simpleCtx) Import(importPath string, srcDir string, mode build.ImportMode) (*PackageData, error) {
-	bctx, mode := sc.applyPackageTweaks(importPath, mode)
+	bctx, mode := sc.applyPreloadTweaks(importPath, srcDir, mode)
 	pkg, err := bctx.Import(importPath, srcDir, mode)
 	if err != nil {
 		return nil, err
@@ -50,10 +95,11 @@ func (sc simpleCtx) Import(importPath string, srcDir string, mode build.ImportMo
 	if err != nil {
 		return nil, fmt.Errorf("failed to enumerate .inc.js files in %s: %w", pkg.Dir, err)
 	}
-	pkg.PkgObj = sc.rewritePkgObj(pkg.PkgObj)
 	if !path.IsAbs(pkg.Dir) {
 		pkg.Dir = mustAbs(pkg.Dir)
 	}
+	pkg = sc.applyPostloadTweaks(pkg)
+
 	return &PackageData{
 		Package:   pkg,
 		IsVirtual: sc.isVirtual,
@@ -116,7 +162,16 @@ func (sc simpleCtx) Match(patterns []string) ([]string, error) {
 	return matches, nil
 }
 
-func (sc simpleCtx) GOOS() string { return sc.bctx.GOOS }
+func (sc simpleCtx) Env() Env {
+	return Env{
+		GOROOT:        sc.bctx.GOROOT,
+		GOPATH:        sc.bctx.GOPATH,
+		GOOS:          sc.bctx.GOOS,
+		GOARCH:        sc.bctx.GOARCH,
+		BuildTags:     sc.bctx.BuildTags,
+		InstallSuffix: sc.bctx.InstallSuffix,
+	}
+}
 
 // gotool executes the go tool set up for the build context and returns standard output.
 func (sc simpleCtx) gotool(subcommand string, args ...string) (string, error) {
@@ -152,73 +207,93 @@ func (sc simpleCtx) gotool(subcommand string, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
-// applyPackageTweaks makes several package-specific adjustments to package importing.
+// applyPreloadTweaks makes several package-specific adjustments to package importing.
 //
 // Ideally this method would not be necessary, but currently several packages
 // require special handing in order to be compatible with GopherJS. This method
 // returns a copy of the build context, keeping the original one intact.
-func (sc simpleCtx) applyPackageTweaks(importPath string, mode build.ImportMode) (build.Context, build.ImportMode) {
+func (sc simpleCtx) applyPreloadTweaks(importPath string, srcDir string, mode build.ImportMode) (build.Context, build.ImportMode) {
 	bctx := sc.bctx
+	if sc.isStd(importPath, srcDir) {
+		// For most of the platform-dependent code in the standard library we simply
+		// reuse implementations targeting WebAssembly. For the user-supplied we use
+		// regular gopherjs-specific GOOS/GOARCH.
+		bctx.GOOS = "js"
+		bctx.GOARCH = "wasm"
+	}
 	switch importPath {
-	case "syscall":
-		// syscall needs to use a typical GOARCH like amd64 to pick up definitions for _Socklen, BpfInsn, IFNAMSIZ, Timeval, BpfStat, SYS_FCNTL, Flock_t, etc.
-		bctx.GOARCH = build.Default.GOARCH
-		bctx.InstallSuffix += build.Default.GOARCH
-	case "syscall/js":
-		if !sc.isVirtual {
-			// There are no buildable files in this package upstream, but we need to use files in the virtual directory.
-			mode |= build.FindOnly
-		}
-	case "crypto/x509", "os/user":
-		// These stdlib packages have cgo and non-cgo versions (via build tags); we want the latter.
-		bctx.CgoEnabled = false
 	case "github.com/gopherjs/gopherjs/js", "github.com/gopherjs/gopherjs/nosync":
-		// These packages are already embedded via gopherjspkg.FS virtual filesystem (which can be
-		// safely vendored). Don't try to use vendor directory to resolve them.
+		// These packages are already embedded via gopherjspkg.FS virtual filesystem
+		// (which can be safely vendored). Don't try to use vendor directory to
+		// resolve them.
 		mode |= build.IgnoreVendor
 	}
 
 	return bctx, mode
 }
 
-func (sc simpleCtx) rewritePkgObj(orig string) string {
-	if orig == "" {
-		return orig
+// applyPostloadTweaks makes adjustments to the contents of the loaded package.
+//
+// Some of the standard library packages require additional tweaks that are not
+// covered by our augmentation logic, for example excluding or including
+// particular source files. This method ensures that all such tweaks are applied
+// before the package is returned to the caller.
+func (sc simpleCtx) applyPostloadTweaks(pkg *build.Package) *build.Package {
+	if sc.isVirtual {
+		// GopherJS overlay package sources don't need tweaks to their content,
+		// since we already control them directly.
+		return pkg
+	}
+	if sc.noPostTweaks {
+		return pkg
+	}
+	switch pkg.ImportPath {
+	case "runtime":
+		pkg.GoFiles = []string{} // Package sources are completely replaced in natives.
+	case "runtime/pprof":
+		pkg.GoFiles = nil
+	case "sync":
+		// GopherJS completely replaces sync.Pool implementation with a simpler one,
+		// since it always executes in a single-threaded environment.
+		pkg.GoFiles = exclude(pkg.GoFiles, "pool.go")
+	case "syscall/js":
+		// Reuse upstream tests to ensure conformance, but completely replace
+		// implementation.
+		pkg.GoFiles = []string{}
+		pkg.TestGoFiles = []string{}
 	}
 
-	goroot := mustAbs(sc.bctx.GOROOT)
-	gopath := mustAbs(sc.bctx.GOPATH)
-	orig = mustAbs(orig)
+	pkg.Imports, pkg.ImportPos = updateImports(pkg.GoFiles, pkg.ImportPos)
+	pkg.TestImports, pkg.TestImportPos = updateImports(pkg.TestGoFiles, pkg.TestImportPos)
+	pkg.XTestImports, pkg.XTestImportPos = updateImports(pkg.XTestGoFiles, pkg.XTestImportPos)
 
-	if strings.HasPrefix(orig, filepath.Join(gopath, "pkg", "mod")) {
-		// Go toolchain makes sources under GOPATH/pkg/mod readonly, so we can't
-		// store our artifacts there.
-		return cachedPath(orig)
+	return pkg
+}
+
+// isStd returns true if the given importPath resolves into a standard library
+// package. Relative paths are interpreted relative to srcDir.
+func (sc simpleCtx) isStd(importPath, srcDir string) bool {
+	pkg, err := sc.bctx.Import(importPath, srcDir, build.FindOnly)
+	if err != nil {
+		return false
 	}
-
-	allowed := []string{goroot, gopath}
-	for _, prefix := range allowed {
-		if strings.HasPrefix(orig, prefix) {
-			// Traditional GOPATH-style locations for build artifacts are ok to use.
-			return orig
-		}
-	}
-
-	// Everything else also goes into the cache just in case.
-	return cachedPath(orig)
+	return pkg.Goroot
 }
 
 var defaultBuildTags = []string{
 	"netgo",            // See https://godoc.org/net#hdr-Name_Resolution.
 	"purego",           // See https://golang.org/issues/23172.
 	"math_big_pure_go", // Use pure Go version of math/big.
+	// We can't set compiler to gopherjs, since Go tooling doesn't support that,
+	// but, we can at least always set this build tag.
+	"gopherjs",
 }
 
 // embeddedCtx creates simpleCtx that imports from a virtual FS embedded into
 // the GopherJS compiler.
-func embeddedCtx(embedded http.FileSystem, installSuffix string, buildTags []string) *simpleCtx {
+func embeddedCtx(embedded http.FileSystem, e Env) *simpleCtx {
 	fs := &vfs{embedded}
-	ec := goCtx(installSuffix, buildTags)
+	ec := goCtx(e)
 	ec.bctx.GOPATH = ""
 
 	// Path functions must behave unix-like to work with the VFS.
@@ -235,19 +310,32 @@ func embeddedCtx(embedded http.FileSystem, installSuffix string, buildTags []str
 	return ec
 }
 
+// overlayCtx creates simpleCtx that imports from the embedded standard library
+// overlays.
+func overlayCtx(e Env) *simpleCtx {
+	return embeddedCtx(&withPrefix{fs: natives.FS, prefix: e.GOROOT}, e)
+}
+
+// gopherjsCtx creates a simpleCtx that imports from the embedded gopherjs
+// packages in case they are not present in the user's source tree.
+func gopherjsCtx(e Env) *simpleCtx {
+	gopherjsRoot := filepath.Join(e.GOROOT, "src", "github.com", "gopherjs", "gopherjs")
+	return embeddedCtx(&withPrefix{gopherjspkg.FS, gopherjsRoot}, e)
+}
+
 // goCtx creates simpleCtx that imports from the real file system GOROOT, GOPATH
 // or Go Modules.
-func goCtx(installSuffix string, buildTags []string) *simpleCtx {
+func goCtx(e Env) *simpleCtx {
 	gc := simpleCtx{
 		bctx: build.Context{
-			GOROOT:        DefaultGOROOT,
-			GOPATH:        build.Default.GOPATH,
-			GOOS:          build.Default.GOOS,
-			GOARCH:        "js",
-			InstallSuffix: installSuffix,
+			GOROOT:        e.GOROOT,
+			GOPATH:        e.GOPATH,
+			GOOS:          e.GOOS,
+			GOARCH:        e.GOARCH,
+			InstallSuffix: e.InstallSuffix,
 			Compiler:      "gc",
-			BuildTags:     append(buildTags, defaultBuildTags...),
-			CgoEnabled:    true, // detect `import "C"` to throw proper error
+			BuildTags:     append(append([]string{}, e.BuildTags...), defaultBuildTags...),
+			CgoEnabled:    false, // CGo is not supported by GopherJS.
 
 			// go/build supports modules, but only when no FS access functions are
 			// overridden and when provided ReleaseTags match those of the default
@@ -286,7 +374,7 @@ func (cc chainedCtx) Import(importPath string, srcDir string, mode build.ImportM
 	}
 }
 
-func (cc chainedCtx) GOOS() string { return cc.primary.GOOS() }
+func (cc chainedCtx) Env() Env { return cc.primary.Env() }
 
 // Match implements XContext.Match().
 //
@@ -323,4 +411,69 @@ func IsPkgNotFound(err error) bool {
 	return err != nil &&
 		(strings.Contains(err.Error(), "cannot find package") || // Modules off.
 			strings.Contains(err.Error(), "is not in GOROOT")) // Modules on.
+}
+
+// updateImports package's list of import paths to only those present in sources
+// after post-load tweaks.
+func updateImports(sources []string, importPos map[string][]token.Position) (newImports []string, newImportPos map[string][]token.Position) {
+	if importPos == nil {
+		// Short-circuit for tests when no imports are loaded.
+		return nil, nil
+	}
+	sourceSet := map[string]bool{}
+	for _, source := range sources {
+		sourceSet[source] = true
+	}
+
+	newImportPos = map[string][]token.Position{}
+	for importPath, positions := range importPos {
+		for _, pos := range positions {
+			if sourceSet[filepath.Base(pos.Filename)] {
+				newImportPos[importPath] = append(newImportPos[importPath], pos)
+			}
+		}
+	}
+
+	for importPath := range newImportPos {
+		newImports = append(newImports, importPath)
+	}
+	sort.Strings(newImports)
+	return newImports, newImportPos
+}
+
+// jsFilesFromDir finds and loads any *.inc.js packages in the build context
+// directory.
+func jsFilesFromDir(bctx *build.Context, dir string) ([]JSFile, error) {
+	files, err := buildutil.ReadDir(bctx, dir)
+	if err != nil {
+		return nil, err
+	}
+	var jsFiles []JSFile
+	for _, file := range files {
+		if !strings.HasSuffix(file.Name(), ".inc.js") || file.IsDir() {
+			continue
+		}
+		if file.Name()[0] == '_' || file.Name()[0] == '.' {
+			continue // Skip "hidden" files that are typically ignored by the Go build system.
+		}
+
+		path := buildutil.JoinPath(bctx, dir, file.Name())
+		f, err := buildutil.OpenFile(bctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open %s from %v: %w", path, bctx, err)
+		}
+		defer f.Close()
+
+		content, err := io.ReadAll(f)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s from %v: %w", path, bctx, err)
+		}
+
+		jsFiles = append(jsFiles, JSFile{
+			Path:    path,
+			ModTime: file.ModTime(),
+			Content: content,
+		})
+	}
+	return jsFiles, nil
 }

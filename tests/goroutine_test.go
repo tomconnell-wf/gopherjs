@@ -3,6 +3,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -264,4 +266,49 @@ func TestEventLoopStarvation(t *testing.T) {
 		}
 	}()
 	<-ctx.Done()
+}
+
+func TestGoroutineBuiltin(t *testing.T) {
+	// Test that a built-in function can be a goroutine body.
+	// https://github.com/gopherjs/gopherjs/issues/547.
+	c := make(chan bool)
+	go close(c)
+	<-c // Wait until goroutine executes successfully.
+}
+
+func TestGoroutineJsObject(t *testing.T) {
+	// Test that js.Object methods can be a goroutine body.
+	// https://github.com/gopherjs/gopherjs/issues/547.
+	if !(runtime.GOOS == "js" || runtime.GOARCH == "js") {
+		t.Skip("Test requires GopherJS")
+	}
+	o := js.Global.Get("Object").New()
+	go o.Set("x", "y")
+	// Wait until the goroutine executes successfully. Can't use locks here
+	// because goroutine body must be a bare js.Object method call.
+	for o.Get("x").String() != "y" {
+		runtime.Gosched()
+	}
+}
+
+func issue1106() {
+	select {
+	default:
+	}
+}
+
+func TestIssue1106(t *testing.T) {
+	// https://github.com/gopherjs/gopherjs/issues/1106#issuecomment-1046323374
+	var done int32 = 0
+	go func() {
+		f := issue1106
+		f()
+		atomic.AddInt32(&done, 1)
+	}()
+
+	// Will get stuck here if #1106 is not fixed.
+	for !atomic.CompareAndSwapInt32(&done, 1, 1) {
+		// Maintain one active goroutine to prevent Node from exiting.
+		runtime.Gosched()
+	}
 }
