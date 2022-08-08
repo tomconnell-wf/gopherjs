@@ -205,7 +205,7 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			}, label, fc.Flattened[s])
 
 		case *types.Map:
-			// TODO - probably could make this more effient with a for..of
+			// TODO - probably could make this more efficient with a for..of
 			iVar := fc.newVariable("_i")
 			fc.Printf("%s = 0;", iVar)
 			keysVar := fc.newVariable("_keys")
@@ -738,7 +738,16 @@ func (fc *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: l.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
 			keyVar := fc.newVariable("_key")
-			return fmt.Sprintf(`%s = %s; (%s || $throwRuntimeError("assignment to entry in nil map"))[%s.keyFor(%s)] = { k: %s, v: %s };`, keyVar, fc.translateImplicitConversionWithCloning(l.Index, t.Key()), fc.translateExpr(l.X), fc.typeName(t.Key()), keyVar, keyVar, fc.translateImplicitConversionWithCloning(rhs, t.Elem()))
+			return fmt.Sprintf(
+				`%s || $throwRuntimeError("assignment to entry in nil map"); %s = %s; %s.set(%s.keyFor(%s), %s);`,
+				fc.translateExpr(l.X),
+				keyVar,
+				fc.translateImplicitConversionWithCloning(l.Index, t.Key()),
+				fc.translateExpr(l.X),
+				fc.typeName(t.Key()),
+				keyVar,
+				fc.translateImplicitConversionWithCloning(rhs, t.Elem()),
+			)
 		}
 	}
 
