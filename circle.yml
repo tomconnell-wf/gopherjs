@@ -267,8 +267,8 @@ commands:
       - run:
           name: Install required Node.js packages
           command: |
-                # Extra flags to avoid installing node-syscall.
-                npm install --no-optional --no-package-lock
+              # Extra flags to avoid installing node-syscall.
+              npm install --no-optional --no-package-lock
     - when:
         condition: << parameters.optional >>
         steps:
