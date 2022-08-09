@@ -983,7 +983,9 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		args = fc.expandTupleArgs(args)
 		keyType := fc.pkgCtx.TypeOf(args[0]).Underlying().(*types.Map).Key()
 		return fc.formatExpr(
-			`%e.delete(%s.keyFor(%s))`,
+			`%e.delete(%s); delete %e[%s.keyFor(%s)]`,
+			args[0],
+			fc.translateImplicitConversion(args[1], keyType),
 			args[0],
 			fc.typeName(keyType),
 			fc.translateImplicitConversion(args[1], keyType),
@@ -1053,6 +1055,8 @@ func (fc *funcContext) translateConversion(expr ast.Expr, desiredType types.Type
 				if named, isNamed := ptr.Elem().(*types.Named); isNamed {
 					switch named.Obj().Name() {
 					case "arrayType", "chanType", "funcType", "interfaceType", "mapType", "ptrType", "sliceType", "structType":
+						// TODO Printf?
+						//println(`translateConversion`, expr, desiredType, call)
 						return fc.formatExpr("%e.kindType", call.Args[0]) // unsafe conversion
 					default:
 						return fc.translateExpr(expr)

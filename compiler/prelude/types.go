@@ -620,7 +620,8 @@ var $makeMap = function(keyForFunc, entries) {
   var m = new Map();
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
-    m.set(keyForFunc(e.k), e.v);
+    m[keyForFunc(e.k)] = e
+    m.set(e.k, e.v);
   }
   return m;
 };
