@@ -983,7 +983,7 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		args = fc.expandTupleArgs(args)
 		keyType := fc.pkgCtx.TypeOf(args[0]).Underlying().(*types.Map).Key()
 		return fc.formatExpr(
-			` delete %e[%s.keyFor(%s)]; %e.delete(%s)`,
+			`delete %e[%s.keyFor(%s)]; %e.delete(%s)`,
 			args[0],
 			fc.typeName(keyType),
 			fc.translateImplicitConversion(args[1], keyType),
