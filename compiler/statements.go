@@ -705,16 +705,16 @@ func (fc *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 			}
 			keyVar := fc.newVariable("_key")
 			return fmt.Sprintf(
-				`%s || $throwRuntimeError("assignment to entry in nil map"); %s = %s; %s.set(%s, %s); %s[%s.keyFor(%s)] = { k: %s, v: %s };`,
+				`%s || $throwRuntimeError("assignment to entry in nil map"); %s = %s; %s[%s.keyFor(%s)] = { k: %s, v: %s }; %s.set(%s, %s)`,
 				fc.translateExpr(l.X),
 				keyVar,
 				fc.translateImplicitConversionWithCloning(l.Index, t.Key()),
 				fc.translateExpr(l.X),
+				fc.typeName(t.Key()),
+				keyVar,
 				keyVar,
 				fc.translateImplicitConversionWithCloning(rhs, t.Elem()),
 				fc.translateExpr(l.X),
-				fc.typeName(t.Key()),
-				keyVar,
 				keyVar,
 				fc.translateImplicitConversionWithCloning(rhs, t.Elem()),
 			)
