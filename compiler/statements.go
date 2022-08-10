@@ -212,8 +212,10 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			fc.Printf("%s = 0;", iVar)
 			keysVar := fc.newVariable("_keys")
 			fc.Printf("%s = %s ? %s.keys() : [];", keysVar, refVar, refVar)
+			sizeVar := fc.newVariable("_size")
+			fc.Printf("%s = %s.size", sizeVar, refVar)
 
-			fc.translateLoopingStmt(func() string { return iVar + " < " + refVar + ".size" }, s.Body, func() {
+			fc.translateLoopingStmt(func() string { return iVar + " < " + sizeVar }, s.Body, func() {
 				keyVar := fc.newVariable("_key")
 				entryVar := fc.newVariable("_entry")
 				fc.Printf("%s = %s.next().value;", keyVar, keysVar)
@@ -704,6 +706,10 @@ func (fc *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: l.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
 			keyVar := fc.newVariable("_key")
+			// Use a reference to the same clone to be used in the object property and the JS map api
+			elemVar := fc.newVariable(`_elem`)
+			fc.Printf("%s = %s", elemVar, fc.translateImplicitConversionWithCloning(rhs, t.Elem()))
+
 			return fmt.Sprintf(
 				`%s || $throwRuntimeError("assignment to entry in nil map"); %s = %s; %s[%s.keyFor(%s)] = { k: %s, v: %s }; %s.set(%s, %s)`,
 				fc.translateExpr(l.X),
@@ -713,10 +719,10 @@ func (fc *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 				fc.typeName(t.Key()),
 				keyVar,
 				keyVar,
-				fc.translateImplicitConversionWithCloning(rhs, t.Elem()),
+				elemVar,
 				fc.translateExpr(l.X),
 				keyVar,
-				fc.translateImplicitConversionWithCloning(rhs, t.Elem()),
+				elemVar,
 			)
 		}
 	}
