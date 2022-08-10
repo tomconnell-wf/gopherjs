@@ -12,6 +12,13 @@ func Test_MapLiteral(t *testing.T) {
 	assertMapApi(t, myMap)
 }
 
+func Test_MapLiteralAssign(t *testing.T) {
+	myMap := map[string]int{}
+	myMap[`test`] = 0
+	myMap[`key`] = 1
+	myMap[`charm`] = 2
+}
+
 func Test_MapMake(t *testing.T) {
 	myMap := make(map[string]int)
 	myMap[`test`] = 0
