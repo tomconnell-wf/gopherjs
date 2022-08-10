@@ -220,7 +220,6 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 				entryVar := fc.newVariable("_entry")
 				fc.Printf("%s = %s.next().value;", keyVar, keysVar)
 				fc.Printf("%s = %s.get(%s);", entryVar, refVar, keyVar)
-				//fc.Printf("console.log('loop', %s, %s, %s, %s, %s)", refVar, keyVar, entryVar, keysVar, iVar)
 				fc.translateStmt(&ast.IfStmt{
 					Cond: fc.newIdent(entryVar+" === undefined", types.Typ[types.Bool]),
 					Body: &ast.BlockStmt{List: []ast.Stmt{&ast.BranchStmt{Tok: token.CONTINUE}}},
