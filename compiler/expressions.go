@@ -1055,8 +1055,6 @@ func (fc *funcContext) translateConversion(expr ast.Expr, desiredType types.Type
 				if named, isNamed := ptr.Elem().(*types.Named); isNamed {
 					switch named.Obj().Name() {
 					case "arrayType", "chanType", "funcType", "interfaceType", "mapType", "ptrType", "sliceType", "structType":
-						// TODO Printf?
-						//println(`translateConversion`, expr, desiredType, call)
 						return fc.formatExpr("%e.kindType", call.Args[0]) // unsafe conversion
 					default:
 						return fc.translateExpr(expr)
