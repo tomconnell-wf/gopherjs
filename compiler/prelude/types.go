@@ -620,11 +620,7 @@ var $makeMap = function(keyForFunc, entries) {
   var m = new Map();
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
-    // Setting the key and element as a object property allows reflection to work...
-    m[keyForFunc(e.k)] = e
-    // ...and we set the key and value in the map api for faster len and range calls.
-    // These are references, so memory usage shouldn't be significantly higher.
-    m.set(e.k, e.v);
+    m.set(keyForFunc(e.k), e);
   }
   return m;
 };

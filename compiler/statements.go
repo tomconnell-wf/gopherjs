@@ -223,10 +223,10 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 					Body: &ast.BlockStmt{List: []ast.Stmt{&ast.BranchStmt{Tok: token.CONTINUE}}},
 				}, nil)
 				if !isBlank(s.Key) {
-					fc.Printf("%s", fc.translateAssign(s.Key, fc.newIdent(keyVar, t.Key()), s.Tok == token.DEFINE))
+					fc.Printf("%s", fc.translateAssign(s.Key, fc.newIdent(entryVar+".k", t.Key()), s.Tok == token.DEFINE))
 				}
 				if !isBlank(s.Value) {
-					fc.Printf("%s", fc.translateAssign(s.Value, fc.newIdent(entryVar, t.Elem()), s.Tok == token.DEFINE))
+					fc.Printf("%s", fc.translateAssign(s.Value, fc.newIdent(entryVar+".v", t.Elem()), s.Tok == token.DEFINE))
 				}
 			}, func() {
 				fc.Printf("%s++;", iVar)
@@ -703,23 +703,19 @@ func (fc *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: l.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
 			keyVar := fc.newVariable("_key")
-			// Use a reference to the same clone to be used in the object property and the JS map api
-			elemVar := fc.newVariable(`_elem`)
-			fc.Printf("%s = %s", elemVar, fc.translateImplicitConversionWithCloning(rhs, t.Elem()))
+			fc.Printf("%s = %s", keyVar, fc.translateImplicitConversionWithCloning(l.Index, t.Key()))
+
+			valueVar := fc.newVariable(`_value`)
+			fc.Printf("%s = %s", valueVar, fc.translateImplicitConversionWithCloning(rhs, t.Elem()))
 
 			return fmt.Sprintf(
-				`%s || $throwRuntimeError("assignment to entry in nil map"); %s = %s; %s[%s.keyFor(%s)] = { k: %s, v: %s }; %s.set(%s, %s)`,
+				`%s || $throwRuntimeError("assignment to entry in nil map"); %s.set(%s.keyFor(%s), { k: %s, v: %s })`,
 				fc.translateExpr(l.X),
-				keyVar,
-				fc.translateImplicitConversionWithCloning(l.Index, t.Key()),
 				fc.translateExpr(l.X),
 				fc.typeName(t.Key()),
 				keyVar,
 				keyVar,
-				elemVar,
-				fc.translateExpr(l.X),
-				keyVar,
-				elemVar,
+				valueVar,
 			)
 		}
 	}

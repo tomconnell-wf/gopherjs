@@ -473,11 +473,11 @@ func (fc *funcContext) translateExpr(expr ast.Expr) *expression {
 			if typesutil.IsJsObject(fc.pkgCtx.TypeOf(e.Index)) {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: e.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
-			key := fmt.Sprintf("%s", fc.translateImplicitConversion(e.Index, t.Key()))
+			key := fmt.Sprintf("%s.keyFor(%s)", fc.typeName(t.Key()), fc.translateImplicitConversion(e.Index, t.Key()))
 			entryVar := fc.newVariable("_entry")
 			if _, isTuple := exprType.(*types.Tuple); isTuple {
 				return fc.formatExpr(
-					`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? [%1s, true] : [%4e, false])`,
+					`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? [%1s.v, true] : [%4e, false])`,
 					entryVar,
 					e.X,
 					key,
@@ -485,7 +485,7 @@ func (fc *funcContext) translateExpr(expr ast.Expr) *expression {
 				)
 			}
 			return fc.formatExpr(
-				`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? %1s : %4e)`,
+				`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? %1s.v : %4e)`,
 				entryVar,
 				e.X,
 				key,
@@ -983,11 +983,9 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		args = fc.expandTupleArgs(args)
 		keyType := fc.pkgCtx.TypeOf(args[0]).Underlying().(*types.Map).Key()
 		return fc.formatExpr(
-			`delete %e[%s.keyFor(%s)]; %e.delete(%s)`,
+			`%e.delete(%s.keyFor(%s))`,
 			args[0],
 			fc.typeName(keyType),
-			fc.translateImplicitConversion(args[1], keyType),
-			args[0],
 			fc.translateImplicitConversion(args[1], keyType),
 		)
 	case "copy":
