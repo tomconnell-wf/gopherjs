@@ -160,3 +160,78 @@ func containsString(s []string, e string) bool {
 	}
 	return false
 }
+
+// These benchmarks test various Map operations, and include a slice benchmark for reference.
+const size = 10000
+
+func makeMap(size int) map[int]string {
+	myMap := make(map[int]string, size)
+	for i := 0; i < size; i++ {
+		myMap[i] = `data`
+	}
+
+	return myMap
+}
+
+func makeSlice(size int) []int {
+	slice := make([]int, size)
+	for i := 0; i < size; i++ {
+		slice[i] = i
+	}
+
+	return slice
+}
+
+func BenchmarkSliceLen(b *testing.B) {
+	slice := makeSlice(size)
+
+	for i := 0; i < b.N; i++ {
+		if len(slice) > 0 {
+		}
+	}
+}
+
+func BenchmarkMapLen(b *testing.B) {
+	myMap := makeMap(size)
+
+	for i := 0; i < b.N; i++ {
+		if len(myMap) > 0 {
+		}
+	}
+}
+
+func BenchmarkMapNilCheck(b *testing.B) {
+	myMap := makeMap(size)
+
+	for i := 0; i < b.N; i++ {
+		if myMap != nil {
+		}
+	}
+}
+
+func BenchmarkMapNilElementCheck(b *testing.B) {
+	myMap := makeMap(size)
+
+	for i := 0; i < b.N; i++ {
+		if myMap[0] != `` {
+		}
+	}
+}
+
+func BenchmarkSliceRange(b *testing.B) {
+	slice := makeSlice(size)
+
+	for i := 0; i < b.N; i++ {
+		for range slice {
+		}
+	}
+}
+
+func BenchmarkMapRange(b *testing.B) {
+	myMap := makeMap(size)
+
+	for i := 0; i < b.N; i++ {
+		for range myMap {
+		}
+	}
+}
