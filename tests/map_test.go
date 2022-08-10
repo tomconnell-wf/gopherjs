@@ -69,6 +69,22 @@ func assertMapApi(t *testing.T, myMap map[string]int) {
 		t.Error(`initial len of map should be 3`)
 	}
 
+	var keys []string
+	var values []int
+
+	for k, v := range myMap {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	if len(keys) != 3 || !containsString(keys, `test`) || !containsString(keys, `key`) || !containsString(keys, `charm`) {
+		t.Error(`range did not contain the correct keys`)
+	}
+
+	if len(values) != 3 || !containsInt(values, 0) || !containsInt(values, 1) || !containsInt(values, 2) {
+		t.Error(`range did not contain the correct values`)
+	}
+
 	if myMap[`test`] != 0 {
 		t.Error(`value should be 0`)
 	}
@@ -125,4 +141,22 @@ func assertMapApi(t *testing.T, myMap map[string]int) {
 	if len(myMap2) != len(myMap) {
 		t.Error(`copy should be equivalent`)
 	}
+}
+
+func containsInt(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
