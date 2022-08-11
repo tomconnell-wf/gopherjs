@@ -634,7 +634,7 @@ func keyFor(t *rtype, key unsafe.Pointer) (*js.Object, string) {
 
 func mapaccess(t *rtype, m, key unsafe.Pointer) unsafe.Pointer {
 	_, k := keyFor(t, key)
-	entry := js.InternalObject(m).Get(k)
+	entry := js.InternalObject(m).Call(`get`, k)
 	if entry == js.Undefined {
 		return nil
 	}
@@ -653,12 +653,12 @@ func mapassign(t *rtype, m, key, val unsafe.Pointer) {
 	entry := js.Global.Get("Object").New()
 	entry.Set("k", kv)
 	entry.Set("v", jsVal)
-	js.InternalObject(m).Set(k, entry)
+	js.InternalObject(m).Call(`set`, k, entry)
 }
 
 func mapdelete(t *rtype, m unsafe.Pointer, key unsafe.Pointer) {
 	_, k := keyFor(t, key)
-	js.InternalObject(m).Delete(k)
+	js.InternalObject(m).Call(`delete`, k)
 }
 
 // TODO(nevkonatkte): The following three "faststr" implementations are meant to
