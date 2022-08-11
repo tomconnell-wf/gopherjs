@@ -473,17 +473,24 @@ func (fc *funcContext) translateExpr(expr ast.Expr) *expression {
 			if typesutil.IsJsObject(fc.pkgCtx.TypeOf(e.Index)) {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: e.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
-			key := fmt.Sprintf("%s.keyFor(%s)", fc.typeName(t.Key()), fc.translateImplicitConversion(e.Index, t.Key()))
+			key := fmt.Sprintf("%s", fc.translateImplicitConversion(e.Index, t.Key()))
+			entryVar := fc.newVariable("_entry")
 			if _, isTuple := exprType.(*types.Tuple); isTuple {
 				return fc.formatExpr(
-					`(%1s = %2e[%3s], %1s !== undefined ? [%1s.v, true] : [%4e, false])`,
-					fc.newVariable("_entry"),
+					`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? [%1s, true] : [%4e, false])`,
+					entryVar,
 					e.X,
 					key,
 					fc.zeroValue(t.Elem()),
 				)
 			}
-			return fc.formatExpr(`(%1s = %2e[%3s], %1s !== undefined ? %1s.v : %4e)`, fc.newVariable("_entry"), e.X, key, fc.zeroValue(t.Elem()))
+			return fc.formatExpr(
+				`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? %1s : %4e)`,
+				entryVar,
+				e.X,
+				key,
+				fc.zeroValue(t.Elem()),
+			)
 		case *types.Basic:
 			return fc.formatExpr("%e.charCodeAt(%f)", e.X, e.Index)
 		default:
@@ -925,9 +932,9 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 			return fc.formatExpr("$makeSlice(%s, %f)", t, args[1])
 		case *types.Map:
 			if len(args) == 2 && fc.pkgCtx.Types[args[1]].Value == nil {
-				return fc.formatExpr(`((%1f < 0 || %1f > 2147483647) ? $throwRuntimeError("makemap: size out of range") : {})`, args[1])
+				return fc.formatExpr(`((%1f < 0 || %1f > 2147483647) ? $throwRuntimeError("makemap: size out of range") : new Map())`, args[1])
 			}
-			return fc.formatExpr("{}")
+			return fc.formatExpr(`new Map()`)
 		case *types.Chan:
 			length := "0"
 			if len(args) == 2 {
@@ -946,7 +953,7 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		case *types.Pointer:
 			return fc.formatExpr("(%e, %d)", args[0], argType.Elem().(*types.Array).Len())
 		case *types.Map:
-			return fc.formatExpr("$keys(%e).length", args[0])
+			return fc.formatExpr("%e.size", args[0])
 		case *types.Chan:
 			return fc.formatExpr("%e.$buffer.length", args[0])
 		// length of array is constant
@@ -976,9 +983,11 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		args = fc.expandTupleArgs(args)
 		keyType := fc.pkgCtx.TypeOf(args[0]).Underlying().(*types.Map).Key()
 		return fc.formatExpr(
-			`delete %e[%s.keyFor(%s)]`,
+			`delete %e[%s.keyFor(%s)]; %e.delete(%s)`,
 			args[0],
 			fc.typeName(keyType),
+			fc.translateImplicitConversion(args[1], keyType),
+			args[0],
 			fc.translateImplicitConversion(args[1], keyType),
 		)
 	case "copy":
@@ -1046,6 +1055,8 @@ func (fc *funcContext) translateConversion(expr ast.Expr, desiredType types.Type
 				if named, isNamed := ptr.Elem().(*types.Named); isNamed {
 					switch named.Obj().Name() {
 					case "arrayType", "chanType", "funcType", "interfaceType", "mapType", "ptrType", "sliceType", "structType":
+						// TODO Printf?
+						//println(`translateConversion`, expr, desiredType, call)
 						return fc.formatExpr("%e.kindType", call.Args[0]) // unsafe conversion
 					default:
 						return fc.translateExpr(expr)
