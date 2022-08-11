@@ -474,11 +474,10 @@ func (fc *funcContext) translateExpr(expr ast.Expr) *expression {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: e.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
 			key := fmt.Sprintf("%s.keyFor(%s)", fc.typeName(t.Key()), fc.translateImplicitConversion(e.Index, t.Key()))
-			entryVar := fc.newVariable("_entry")
 			if _, isTuple := exprType.(*types.Tuple); isTuple {
 				return fc.formatExpr(
 					`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? [%1s.v, true] : [%4e, false])`,
-					entryVar,
+					fc.newVariable("_entry"),
 					e.X,
 					key,
 					fc.zeroValue(t.Elem()),
@@ -486,7 +485,7 @@ func (fc *funcContext) translateExpr(expr ast.Expr) *expression {
 			}
 			return fc.formatExpr(
 				`(%1s = typeof %2e.get === "function" ? %2e.get(%3s) : undefined, %1s !== undefined ? %1s.v : %4e)`,
-				entryVar,
+				fc.newVariable("_entry"),
 				e.X,
 				key,
 				fc.zeroValue(t.Elem()),
