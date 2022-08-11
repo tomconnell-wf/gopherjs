@@ -696,7 +696,8 @@ type hiter struct {
 func (iter *hiter) skipUntilValidKey() {
 	for iter.i < iter.keys.Length() {
 		k := iter.keys.Index(iter.i)
-		if iter.m.Get(k.String()) != js.Undefined {
+		entry := iter.m.Call(`get`, k)
+		if entry != js.Undefined {
 			break
 		}
 		// The key is already deleted. Move on the next item.
@@ -705,10 +706,20 @@ func (iter *hiter) skipUntilValidKey() {
 }
 
 func mapiterinit(t *rtype, m unsafe.Pointer, it *hiter) {
+	mapObj := js.InternalObject(m)
+	//var keys *js.Object
+	keys := js.Global.Get(`Array`).New()
+	if mapObj.Get(`keys`) != js.Undefined {
+		keysIter := mapObj.Call(`keys`)
+		if mapObj.Get(`keys`) != js.Undefined {
+			keys = js.Global.Get(`Array`).Call(`from`, keysIter)
+		}
+	}
+
 	*it = hiter{
 		t:    t,
-		m:    js.InternalObject(m),
-		keys: js.Global.Call("$keys", js.InternalObject(m)),
+		m:    mapObj,
+		keys: keys,
 		i:    0,
 		last: nil,
 	}
@@ -724,7 +735,7 @@ func mapiterkey(it *hiter) unsafe.Pointer {
 			return nil
 		}
 		k := it.keys.Index(it.i)
-		kv = it.m.Get(k.String())
+		kv = it.m.Call(`get`, k)
 
 		// Record the key-value pair for later accesses.
 		it.last = kv
@@ -742,7 +753,7 @@ func mapiterelem(it *hiter) unsafe.Pointer {
 			return nil
 		}
 		k := it.keys.Index(it.i)
-		kv = it.m.Get(k.String())
+		kv = it.m.Call(`get`, k)
 		it.last = kv
 	}
 	return unsafe.Pointer(js.Global.Call("$newDataPointer", kv.Get("v"), jsType(PtrTo(it.t.Elem()))).Unsafe())
