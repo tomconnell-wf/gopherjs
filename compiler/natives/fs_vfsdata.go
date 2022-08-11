@@ -22,7 +22,7 @@ var FS = func() http.FileSystem {
 	fs := vfsgen۰FS{
 		"/": &vfsgen۰DirInfo{
 			name:    "/",
-			modTime: time.Date(2022, 8, 11, 19, 25, 29, 853315903, time.UTC),
+			modTime: time.Date(2022, 8, 11, 20, 58, 31, 519331961, time.UTC),
 		},
 		"/src": &vfsgen۰DirInfo{
 			name:    "src",

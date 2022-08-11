@@ -703,19 +703,15 @@ func (fc *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 				fc.pkgCtx.errList = append(fc.pkgCtx.errList, types.Error{Fset: fc.pkgCtx.fileSet, Pos: l.Index.Pos(), Msg: "cannot use js.Object as map key"})
 			}
 			keyVar := fc.newVariable("_key")
-			fc.Printf("%s = %s", keyVar, fc.translateImplicitConversionWithCloning(l.Index, t.Key()))
-
-			valueVar := fc.newVariable(`_value`)
-			fc.Printf("%s = %s", valueVar, fc.translateImplicitConversionWithCloning(rhs, t.Elem()))
-
 			return fmt.Sprintf(
-				`%s || $throwRuntimeError("assignment to entry in nil map"); %s.set(%s.keyFor(%s), { k: %s, v: %s })`,
-				fc.translateExpr(l.X),
+				`%s = %s; (%s || $throwRuntimeError("assignment to entry in nil map")).set(%s.keyFor(%s), { k: %s, v: %s })`,
+				keyVar,
+				fc.translateImplicitConversionWithCloning(l.Index, t.Key()),
 				fc.translateExpr(l.X),
 				fc.typeName(t.Key()),
 				keyVar,
 				keyVar,
-				valueVar,
+				fc.translateImplicitConversionWithCloning(rhs, t.Elem()),
 			)
 		}
 	}
