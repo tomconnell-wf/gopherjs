@@ -531,7 +531,7 @@ type mapIter struct {
 func (iter *mapIter) skipUntilValidKey() {
 	for iter.i < iter.keys.Length() {
 		k := iter.keys.Index(iter.i)
-		if iter.m.Get(k.String()) != js.Undefined {
+		if iter.m.Call(`get`, k) != js.Undefined {
 			break
 		}
 		// The key is already deleted. Move on the next item.
@@ -540,7 +540,7 @@ func (iter *mapIter) skipUntilValidKey() {
 }
 
 func mapiterinit(t *rtype, m unsafe.Pointer) unsafe.Pointer {
-	return unsafe.Pointer(&mapIter{t, js.InternalObject(m), js.Global.Call("$keys", js.InternalObject(m)), 0, nil})
+	return unsafe.Pointer(&mapIter{t, js.InternalObject(m), js.Global.Get(`Array`).Call(`from`, js.InternalObject(m).Call(`keys`)), 0, nil})
 }
 
 type TypeEx interface {
@@ -559,7 +559,7 @@ func mapiterkey(it unsafe.Pointer) unsafe.Pointer {
 			return nil
 		}
 		k := iter.keys.Index(iter.i)
-		kv = iter.m.Get(k.String())
+		kv = iter.m.Call(`get`, k)
 
 		// Record the key-value pair for later accesses.
 		iter.last = kv

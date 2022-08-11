@@ -765,7 +765,7 @@ func mapiternext(it *hiter) {
 }
 
 func maplen(m unsafe.Pointer) int {
-	return js.Global.Call("$keys", js.InternalObject(m)).Length()
+	return js.InternalObject(m).Get(`size`).Int()
 }
 
 func cvtDirect(v Value, typ Type) Value {
@@ -1390,7 +1390,7 @@ func (v Value) Len() int {
 	case Chan:
 		return v.object().Get("$buffer").Get("length").Int()
 	case Map:
-		return js.Global.Call("$keys", v.object()).Length()
+		return v.object().Get(`size`).Int()
 	default:
 		panic(&ValueError{"reflect.Value.Len", k})
 	}
