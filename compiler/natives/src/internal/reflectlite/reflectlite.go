@@ -574,7 +574,7 @@ func mapiternext(it unsafe.Pointer) {
 }
 
 func maplen(m unsafe.Pointer) int {
-	return js.Global.Call("$keys", js.InternalObject(m)).Length()
+	return js.InternalObject(m).Get(`size`).Int()
 }
 
 func cvtDirect(v Value, typ Type) Value {
