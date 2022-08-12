@@ -624,6 +624,7 @@ var $makeMap = function(keyForFunc, entries) {
   }
   return m;
 };
+
 var $ptrType = function(elem) {
   var typ = elem.ptr;
   if (typ === undefined) {
