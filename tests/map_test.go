@@ -66,6 +66,21 @@ func Test_MapType(t *testing.T) {
 	myMap[`key`] = 666
 }
 
+func Test_MapLenPrecedence(t *testing.T) {
+	// This test verifies that the expression len(m) compiles to is evaluated
+	// correctly in the context of the enclosing expression.
+	m := make(map[string]string)
+
+	if len(m) != 0 {
+		t.Error(`inline len should have been 0`)
+	}
+
+	i := len(m)
+	if i != 0 {
+		t.Error(`assigned len should have been 0`)
+	}
+}
+
 func assertMapApi(t *testing.T, myMap map[string]int) {
 	if len(myMap) != 3 {
 		t.Error(`initial len of map should be 3`)

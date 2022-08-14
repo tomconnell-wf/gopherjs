@@ -952,7 +952,7 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 		case *types.Pointer:
 			return fc.formatExpr("(%e, %d)", args[0], argType.Elem().(*types.Array).Len())
 		case *types.Map:
-			return fc.formatExpr("%e ? %e.size : 0", args[0], args[0])
+			return fc.formatExpr("(%e ? %e.size : 0)", args[0], args[0])
 		case *types.Chan:
 			return fc.formatExpr("%e.$buffer.length", args[0])
 		// length of array is constant
