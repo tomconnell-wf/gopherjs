@@ -623,12 +623,12 @@ func makemap(t *rtype, cap int) (m unsafe.Pointer) {
 	return unsafe.Pointer(js.Global.Get("Map").New().Unsafe())
 }
 
-func keyFor(t *rtype, key unsafe.Pointer) (*js.Object, string) {
+func keyFor(t *rtype, key unsafe.Pointer) (*js.Object, *js.Object) {
 	kv := js.InternalObject(key)
 	if kv.Get("$get") != js.Undefined {
 		kv = kv.Call("$get")
 	}
-	k := jsType(t.Key()).Call("keyFor", kv).String()
+	k := jsType(t.Key()).Call("keyFor", kv)
 	return kv, k
 }
 
