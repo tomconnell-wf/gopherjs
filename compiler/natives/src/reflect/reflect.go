@@ -633,6 +633,9 @@ func keyFor(t *rtype, key unsafe.Pointer) (*js.Object, string) {
 }
 
 func mapaccess(t *rtype, m, key unsafe.Pointer) unsafe.Pointer {
+	if !js.InternalObject(m).Bool() {
+		return nil // nil map
+	}
 	_, k := keyFor(t, key)
 	entry := js.InternalObject(m).Call(`get`, k)
 	if entry == js.Undefined {
@@ -658,6 +661,9 @@ func mapassign(t *rtype, m, key, val unsafe.Pointer) {
 
 func mapdelete(t *rtype, m unsafe.Pointer, key unsafe.Pointer) {
 	_, k := keyFor(t, key)
+	if !js.InternalObject(m).Bool() {
+		return // nil map
+	}
 	js.InternalObject(m).Call(`delete`, k)
 }
 
