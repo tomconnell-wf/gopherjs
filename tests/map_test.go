@@ -81,6 +81,25 @@ func Test_MapLenPrecedence(t *testing.T) {
 	}
 }
 
+func Test_MapRange(t *testing.T) {
+	// This test verifies that all of a map is iterated, even if the map is modified during iteration.
+
+	myMap := map[string]int{`one`: 1, `two`: 2, `three`: 3}
+
+	var seenKeys []string
+
+	for k, _ := range myMap {
+		seenKeys = append(seenKeys, k)
+		if k == `two` {
+			delete(myMap, k)
+		}
+	}
+
+	if len(seenKeys) != 3 {
+		t.Error(`iteration seenKeys len was not 3`)
+	}
+}
+
 func assertMapApi(t *testing.T, myMap map[string]int) {
 	if len(myMap) != 3 {
 		t.Error(`initial len of map should be 3`)
