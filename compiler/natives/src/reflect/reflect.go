@@ -713,7 +713,6 @@ func (iter *hiter) skipUntilValidKey() {
 
 func mapiterinit(t *rtype, m unsafe.Pointer, it *hiter) {
 	mapObj := js.InternalObject(m)
-	//var keys *js.Object
 	keys := js.Global.Get(`Array`).New()
 	if mapObj.Get(`keys`) != js.Undefined {
 		keysIter := mapObj.Call(`keys`)
