@@ -320,7 +320,7 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 		case token.FALLTHROUGH:
 			// handled in CaseClause
 		default:
-			panic("Unhandled branch statment: " + s.Tok.String())
+			panic("Unhandled branch statement: " + s.Tok.String())
 		}
 
 	case *ast.ReturnStmt:
