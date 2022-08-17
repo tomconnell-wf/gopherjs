@@ -210,7 +210,7 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 		case *types.Map:
 			iVar := fc.newVariable("_i")
 			fc.Printf("%s = 0;", iVar)
-			entriesVar := fc.newVariable("_")
+			entriesVar := fc.newVariable("_entries")
 			fc.Printf("%s = %s ? %s.entries() : [];", entriesVar, refVar, refVar)
 
 			sizeVar := fc.newVariable("_size")
@@ -223,10 +223,10 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 					Body: &ast.BlockStmt{List: []ast.Stmt{&ast.BranchStmt{Tok: token.CONTINUE}}},
 				}, nil)
 				if !isBlank(s.Key) {
-					fc.Printf("%s", fc.translateAssign(s.Key, fc.newIdent(entryVar+"[0]", t.Key()), s.Tok == token.DEFINE))
+					fc.Printf("%s", fc.translateAssign(s.Key, fc.newIdent(entryVar+"[1].k", t.Key()), s.Tok == token.DEFINE))
 				}
 				if !isBlank(s.Value) {
-					fc.Printf("%s", fc.translateAssign(s.Value, fc.newIdent(entryVar+"[1]", t.Elem()), s.Tok == token.DEFINE))
+					fc.Printf("%s", fc.translateAssign(s.Value, fc.newIdent(entryVar+"[1].v", t.Elem()), s.Tok == token.DEFINE))
 				}
 			}, func() {
 				fc.Printf("%s++;", iVar)
