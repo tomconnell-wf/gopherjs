@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/gopherjs/gopherjs/js"
 	"strings"
 	"testing"
 )
@@ -112,6 +113,24 @@ func Test_MapRangeNil(t *testing.T) {
 	if i > 0 {
 		t.Error(`Loops happened on a nil map`)
 	}
+}
+
+func Test_MapEmbeddedObject(t *testing.T) {
+	o := js.Global.Get("JSON").Call("parse", `{"props": {"one": 1, "two": 2}}`)
+
+	type data struct {
+		*js.Object
+		Props map[string]int `js:"props"`
+	}
+
+	d := data{Object: o}
+	if d.Props["one"] != 1 {
+		t.Error(`key "one" value should be 1`)
+	}
+	if d.Props["two"] != 2 {
+		t.Error(`key "two" value should be 2`)
+	}
+
 }
 
 func assertMapApi(t *testing.T, myMap map[string]int) {
