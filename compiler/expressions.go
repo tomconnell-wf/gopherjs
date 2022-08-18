@@ -931,9 +931,9 @@ func (fc *funcContext) translateBuiltin(name string, sig *types.Signature, args 
 			return fc.formatExpr("$makeSlice(%s, %f)", t, args[1])
 		case *types.Map:
 			if len(args) == 2 && fc.pkgCtx.Types[args[1]].Value == nil {
-				return fc.formatExpr(`((%1f < 0 || %1f > 2147483647) ? $throwRuntimeError("makemap: size out of range") : new window.Map())`, args[1])
+				return fc.formatExpr(`((%1f < 0 || %1f > 2147483647) ? $throwRuntimeError("makemap: size out of range") : new $global.Map())`, args[1])
 			}
-			return fc.formatExpr(`new window.Map()`)
+			return fc.formatExpr(`new $global.Map()`)
 		case *types.Chan:
 			length := "0"
 			if len(args) == 2 {
