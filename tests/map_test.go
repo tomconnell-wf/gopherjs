@@ -81,7 +81,7 @@ func Test_MapLenPrecedence(t *testing.T) {
 	}
 }
 
-func Test_MapRange(t *testing.T) {
+func Test_MapRangeMutation(t *testing.T) {
 	// This test verifies that all of a map is iterated, even if the map is modified during iteration.
 
 	myMap := map[string]int{`one`: 1, `two`: 2, `three`: 3}
@@ -97,6 +97,20 @@ func Test_MapRange(t *testing.T) {
 
 	if len(seenKeys) != 3 {
 		t.Error(`iteration seenKeys len was not 3`)
+	}
+}
+
+func Test_MapRangeNil(t *testing.T) {
+	// Tests that loops on nil maps do not error.
+	i := 0
+	var m map[string]int
+	for k, v := range m {
+		_, _ = k, v
+		i++
+	}
+
+	if i > 0 {
+		t.Error(`Loops happened on a nil map`)
 	}
 }
 
