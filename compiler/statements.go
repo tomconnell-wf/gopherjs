@@ -211,7 +211,7 @@ func (fc *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			iVar := fc.newVariable("_i")
 			fc.Printf("%s = 0;", iVar)
 			keysVar := fc.newVariable("_keys")
-			fc.Printf("%s = %s ? %s.keys() : undefined", keysVar, refVar, refVar)
+			fc.Printf("%s = %s ? %s.keys() : undefined;", keysVar, refVar, refVar)
 
 			sizeVar := fc.newVariable("_size")
 			fc.Printf("%s = %s ? %s.size : 0;", sizeVar, refVar, refVar)
