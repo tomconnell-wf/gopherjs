@@ -133,6 +133,18 @@ func Test_MapEmbeddedObject(t *testing.T) {
 
 }
 
+func Test_MapDelete(t *testing.T) {
+	var nilMap map[string]string
+	m := map[string]string{`key`: `value`}
+
+	delete(nilMap, `key`) // noop
+	delete(m, `key`)
+	if m[`key`] == `value` {
+		t.Error(`entry should have been deleted`)
+	}
+	delete(m, `key`) // noop
+}
+
 func assertMapApi(t *testing.T, myMap map[string]int) {
 	if len(myMap) != 3 {
 		t.Error(`initial len of map should be 3`)
