@@ -617,10 +617,10 @@ var $mapType = function(key, elem) {
   return typ;
 };
 var $makeMap = function(keyForFunc, entries) {
-  var m = {};
+  var m = new Map();
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
-    m[keyForFunc(e.k)] = e;
+    m.set(keyForFunc(e.k), e);
   }
   return m;
 };
@@ -699,17 +699,22 @@ var $structType = function(pkgPath, fields) {
     if (fields.length === 0) {
       string = "struct {}";
     }
-    typ = $newType(0, $kindStruct, string, false, "", false, function() {
-      this.$val = this;
-      for (var i = 0; i < fields.length; i++) {
-        var f = fields[i];
-        if (f.name == '_') {
-          continue;
-        }
-        var arg = arguments[i];
-        this[f.prop] = arg !== undefined ? arg : f.typ.zero();
-      }
-    });
+    
+    var ctorName = "GO_" + string.replaceAll('"', '').replaceAll('.', '_').replaceAll(/[^a-zA-Z0-9_$]/g, '');
+
+    var ctor = new Function("fields", "return function " + ctorName + "() { \
+      this.$val = this;\
+      for (var i = 0; i < fields.length; i++) {\
+        var f = fields[i];\
+        if (f.name == '_') {\
+          continue;\
+        }\
+        var arg = arguments[i];\
+        this[f.prop] = arg !== undefined ? arg : f.typ.zero();\
+      }\
+    };")(fields);
+    
+    typ = $newType(0, $kindStruct, string, false, "", false, ctor);
     $structTypes[typeKey] = typ;
     typ.init(pkgPath, fields);
   }
